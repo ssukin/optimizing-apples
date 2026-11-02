@@ -128,7 +128,8 @@
     .assumption-note { margin-top: 8px; padding: 8px 10px; border-radius: 11px; background: #f8f7f1; color: #7d887f; font-size: 9px; }
     .footer { margin-top: 17px; color: #a0a59d; font-size: 9px; text-align: center; }
     @media (max-width: 920px) { .layout { grid-template-columns: minmax(0, 280px) minmax(0, 1fr); gap: 12px; } .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metric { min-height: 80px; } }
-    @media (max-width: 720px) { .shell { padding: 18px 14px 32px; } .masthead-note { display: none; } .hero-sticker { flex-basis: 76px; height: 68px; } .hero-sticker svg { width: 58px; height: 58px; } .model-grid { grid-template-columns: 1fr; } .model-part { min-height: auto; } .layout { grid-template-columns: 1fr; } .results { order: 1; } .side { order: 2; } .model-card { padding: 14px; } .card-head { align-items: flex-start; flex-direction: column; } .metrics { gap: 7px; } .model-heading { align-items: flex-start; flex-direction: column; } }
+    @media (max-width: 720px) { .shell { padding: 18px 14px 32px; } .masthead-note { display: none; } .hero-sticker { flex-basis: 76px; height: 68px; } .hero-sticker svg { width: 58px; height: 58px; } .model-grid { grid-template-columns: minmax(0, 1fr); } .model-part { min-height: auto; } .layout { grid-template-columns: minmax(0, 1fr); } .results { order: 1; } .side { order: 2; } .model-card { padding: 14px; } .card-head { align-items: flex-start; flex-direction: column; } .metrics { gap: 7px; } .model-heading { align-items: flex-start; flex-direction: column; } }
+    @media (max-width: 480px) { .shell { padding: 14px 12px 28px; } .hero { align-items: flex-start; flex-direction: column; gap: 10px; } .hero-sticker { align-self: flex-end; flex-basis: 62px; width: 62px; height: 62px; } .hero-sticker svg { width: 50px; height: 50px; } .model-card, .decision-card, .info-card, .chart-card, .table-card { padding-right: 12px; padding-left: 12px; } .model-heading h2 { font-size: 19px; } .model-grid { gap: 8px; } .metrics { gap: 6px; } .metric { min-height: 76px; padding: 10px; } .metric-value { font-size: clamp(20px, 7vw, 25px); } .facts { column-gap: 8px; } .decision-head { align-items: flex-start; } .decision output { white-space: nowrap; } }
   </style>
 </head>
 <body>
@@ -332,7 +333,8 @@
         const band = plotWidth / plan.length;
         const barWidth = Math.min(36, band * .54);
         svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-        svg.replaceChildren(svgEl('title', {}, 'Daily apple allocation under the selected plan'));
+        const defs = svgEl('defs');
+        svg.replaceChildren(svgEl('title', {}, 'Daily apple allocation under the selected plan'), defs);
         for (let value = 0; value <= top; value += step) {
           const y = pad.top + plotHeight - value / top * plotHeight;
           svg.append(svgEl('line', { x1: pad.left, y1: y, x2: width - pad.right, y2: y, stroke: '#eeeae2', 'stroke-width': 1 }));
@@ -344,8 +346,19 @@
           const base = pad.top + plotHeight;
           const group = svgEl('g');
           group.append(svgEl('rect', { x: center - barWidth / 2, y: base - day.ripe * scale, width: barWidth, height: day.ripe * scale, rx: 5, fill: '#e9e8df' }));
-          if (day.visitors) group.append(svgEl('rect', { x: center - barWidth / 2, y: base - day.visitors * scale, width: barWidth, height: day.visitors * scale, rx: 5, fill: '#e98683' }));
-          if (day.employees) group.append(svgEl('rect', { x: center - barWidth / 2, y: base - (day.visitors + day.employees) * scale, width: barWidth, height: day.employees * scale, rx: day.visitors ? 2 : 5, fill: '#5c9674' }));
+          const allocated = day.visitors + day.employees;
+          if (allocated > 0) {
+            const clipId = `allocation-clip-${index}`;
+            const allocatedHeight = allocated * scale;
+            const clipRadius = Math.min(5, barWidth / 2, allocatedHeight / 2);
+            const clipPath = svgEl('clipPath', { id: clipId });
+            clipPath.append(svgEl('rect', { x: center - barWidth / 2, y: base - allocatedHeight, width: barWidth, height: allocatedHeight, rx: clipRadius }));
+            defs.append(clipPath);
+            const allocation = svgEl('g', { 'clip-path': `url(#${clipId})` });
+            if (day.visitors) allocation.append(svgEl('rect', { x: center - barWidth / 2, y: base - day.visitors * scale, width: barWidth, height: day.visitors * scale, fill: '#e98683' }));
+            if (day.employees) allocation.append(svgEl('rect', { x: center - barWidth / 2, y: base - allocatedHeight, width: barWidth, height: day.employees * scale, fill: '#5c9674' }));
+            group.append(allocation);
+          }
           group.append(svgEl('title', {}, `${day.name}: ${lb(day.ripe)} ripe; ${lb(day.visitors)} visitors; ${lb(day.employees)} employees; ${lb(day.leftover)} unallocated`));
           svg.append(group);
           svg.append(svgEl('text', { x: center, y: height - 8, fill: '#7e8980', 'font-size': 10, 'text-anchor': 'middle' }, day.name));
